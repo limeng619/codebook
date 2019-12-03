@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <string.h>
-
+#include <stdlib.h>
 #define LEN 255
 #define MAX_COUNT 255
 #define FILE_NAME "codebook.txt"
+#define ERROR 1
+#define OK 0
 
-void addInfo();
+int addInfo();
 void deleteInfo();
 void modifyInfo();
 void searchInfo();
@@ -14,6 +16,8 @@ void quit();
 void error();
 void deleteAll();
 void deleteOne();
+void encode(char *s);
+
 
 typedef struct {
 	char website[LEN];
@@ -21,14 +25,13 @@ typedef struct {
 	char password[LEN];
 	char remark[LEN];
 } Record;
-
+void encodeRecord(Record* r);
 Record* records[MAX_COUNT];
 int count = 0;
 
 int main() {
 
 	init();
-	
 
 	printf("**************************************************************\n");
 	printf("*                     欢迎使用密码本!                        *\n");
@@ -41,10 +44,18 @@ int main() {
 	printf("*                        0 退出                              *\n");
 	printf("**************************************************************\n");
 	
-	int choice = 1;
+	int choice = -1;
 	scanf("%d", &choice);
+	char tempc;
+	int errTime = 0; 
 	while(choice < 0 || choice > 5) {
-		printf("输入无效，请重输:");
+		setbuf(stdin, NULL);//清空上一次的输入缓冲区。如未清空，当上次输入为非数字时，这次会scanf会直接使用上次的输入 
+		errTime++;
+		if(errTime > 2) {
+			printf("错误3次将退出程序，程序结束\n");
+			return; 
+		}
+		printf("输入无效，输入必须为有效数字，错误3次将退出程序，请重输:\n");
 		scanf("%d", &choice);
 	} 
 	while(choice != 0) {
@@ -87,7 +98,8 @@ void init() {
 	Record* recd;
 	recd = malloc(sizeof(Record));
 	int res = fscanf(fp, "%s%s%s%s", recd->website, recd->username, recd->password, recd->remark);
-	while(res != EOF) {
+	while(res != EOF && count < MAX_COUNT) {
+		encodeRecord(recd);
 		records[count] = recd;
 		count++;
 		recd = malloc(sizeof(Record));
@@ -98,13 +110,26 @@ void init() {
 	fclose(fp);
 }
 
-void addInfo() {
+int addInfo() {
+	
+	if(count >= MAX_COUNT) {
+		printf("容量已满，存储失败！");
+		return ERROR;
+	}
 	
 	Record* recd;
 	recd = malloc(sizeof(Record));
 	
 	printf("请输入需要存储的 站点:");
 	scanf("%s", recd->website, LEN);
+	int i;
+	for(i=0;i<count;i++) {
+		if(strcmp(records[i]->website, recd->website) == 0) {
+				printf("站点信息已存在，添加失败！\n");
+				free(recd);
+				return ERROR;
+		}
+	}
 	printf("请输入需要存储的 账号:");
 	scanf("%s", recd->username, LEN);
 	printf("请输入需要存储的 密码:");
@@ -115,6 +140,7 @@ void addInfo() {
 	records[count++] = recd;
 	printf("存储成功!\n");
 	printf("**************************************************************\n");
+	return OK;
 }
 
 void deleteInfo() {
@@ -126,7 +152,8 @@ void deleteInfo() {
 	} else if(del == 2) {
 		deleteOne();
 	} else {
-		printf("输入无效，请重新输入:");
+		printf("输入无效，请重新输入:\n");
+		setbuf(stdin, NULL);
 		deleteInfo();
 	}
 }
@@ -141,52 +168,73 @@ void deleteAll() {
 }
 
 void deleteOne() {
-	int num;
+	char website[LEN];
+	printf("请输入需要删除的站点：");
+	scanf("%s", website);
 	int i;
-	printf("请输入删除第几条数据？：");
-	scanf("%d", &num);
-	while(num < 1 || num > count) {
-		printf("输入错误，请重输：");
-		scanf("%d", &num);
+	for(i=0;i<count;i++) {
+		if(strcmp(records[i]->website, website) == 0) {
+			free(records[i]); 
+			int j;
+			for(j=i;j<count-1;j++) {
+				records[j] = records[j+1];
+			}
+			count--;
+		}
 	}
-	free(records[num-1]);
-	for(i=num-1;i<count-1;i++) {
-		records[num-1] = records[num];
-	}
-	count--;
 	printf("删除成功！\n");
+	printf("**************************************************************\n");
 }
 
 void modifyInfo() {
-	int num;
-	printf("请输入修改第几条数据？：");
-	scanf("%d", &num);
-	printf("第 %d 条数据信息如下:\n", num);
-	printf("站点：%s\n", records[num-1]->website);
-	printf("账号：%s\n", records[num-1]->username);
-	printf("密码：%s\n", records[num-1]->password);
-	printf("备注：%s\n", records[num-1]->remark);
+	char website[LEN];
+	printf("请输入需要修改的站点：");
+	scanf("%s", website);
+	int i;
+	for(i=0;i<count;i++) {
+		if(strcmp(records[i]->website, website) == 0) {
+				break;
+		}
+	}
+	if(i == count) {
+		printf("未存储该站点信息");
+		return;	
+	}
+	printf("该站点原信息如下:\n");
+	printf("站点：%s\n", records[i]->website);
+	printf("账号：%s\n", records[i]->username);
+	printf("密码：%s\n", records[i]->password);
+	printf("备注：%s\n", records[i]->remark);
 	printf("请输入新的信息:\n");
 	printf("新的 站点:");
-	scanf("%s", records[num-1]->website, LEN);
+	scanf("%s", records[i]->website, LEN);
 	printf("新的 账号:");
-	scanf("%s", records[num-1]->username, LEN);
+	scanf("%s", records[i]->username, LEN);
 	printf("新的 密码:");
-	scanf("%s", records[num-1]->password, LEN);
+	scanf("%s", records[i]->password, LEN);
 	printf("新的 备注:");
-	scanf("%s", records[num-1]->remark, LEN);
+	scanf("%s", records[i]->remark, LEN);
 	printf("修改成功！\n");
+	printf("**************************************************************\n");
 }
 void searchInfo() {
-	int num;
-	printf("请输入查找第几条数据？：!");
-	scanf("%d", &num);
-	printf("第 %d 条数据信息如下:\n", num);
-	printf("站点：%s\n", records[num-1]->website);
-	printf("账号：%s\n", records[num-1]->username);
-	printf("密码：%s\n", records[num-1]->password);
-	printf("备注：%s\n", records[num-1]->remark);
-
+	char website[LEN];
+	int i;
+	int temp = 0;
+	printf("请输入需要查找的站点：");
+	scanf("%s", website);
+	printf("站点 %s 存储信息如下:\n", website);
+	for(i=0;i<count;i++) {
+		if(strcmp(records[i]->website, website) == 0) {
+				temp++;
+				printf("站点：%s\n", records[i]->website);
+				printf("账号：%s\n", records[i]->username);
+				printf("密码：%s\n", records[i]->password);
+				printf("备注：%s\n", records[i]->remark);
+		}
+	}
+	printf("以上，共查询到 %d 条站点 %s 的信息\n", temp, website);
+	printf("**************************************************************\n");
 }
 void getAllInfo() {
 	
@@ -203,10 +251,25 @@ void getAllInfo() {
 	}
 	
 }
+
+void encodeRecord(Record* r) {
+	encode(r->website);
+	encode(r->username);
+	encode(r->password);
+	encode(r->remark);
+}
+
+void encode(char *s) {
+	while(*s != '\0') {
+		*s = *s ^ 9;
+		s++;
+	}
+}
 void quit() {
 	FILE *fp = fopen(FILE_NAME, "w");
 	int i;
 	for(i=0;i<count;i++) {
+		encodeRecord(records[i]);
 		fprintf(fp, "%s %s %s %s\n", records[i]->website, records[i]->username, records[i]->password, records[i]->remark);
 	}
 
